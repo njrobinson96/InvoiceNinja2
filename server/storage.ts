@@ -6,6 +6,8 @@ import {
 } from "@shared/schema";
 import session from "express-session";
 import createMemoryStore from "memorystore";
+import { DatabaseStorage } from "./databaseStorage";
+import { pool } from "./db";
 
 // Interface for storage operations
 export interface IStorage {
@@ -346,4 +348,5 @@ export class MemStorage implements IStorage {
   }
 }
 
-export const storage = new MemStorage();
+// Use DatabaseStorage if DATABASE_URL is set, otherwise fall back to MemStorage
+export const storage = pool ? new DatabaseStorage() : new MemStorage();
