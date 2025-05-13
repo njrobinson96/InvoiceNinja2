@@ -42,6 +42,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         title: "Login successful",
         description: "Welcome back to InvoiceFlow!",
       });
+      
+      // Force a redirection after login success
+      window.location.href = "/";
     },
     onError: (error: Error) => {
       toast({
@@ -63,6 +66,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         title: "Registration successful",
         description: "Welcome to InvoiceFlow!",
       });
+      
+      // Force a redirection after registration success
+      window.location.href = "/";
     },
     onError: (error: Error) => {
       toast({
