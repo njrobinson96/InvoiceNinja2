@@ -97,6 +97,65 @@ export class MemStorage implements IStorage {
         stripeSubscriptionId: null
       };
       this.users.set(testUser.id, testUser);
+      
+      // Create a test client
+      const testClient: Client = {
+        id: this.clientIdCounter++,
+        userId: testUser.id,
+        name: "Test Client",
+        email: "client@example.com",
+        phone: "555-5678",
+        address: "456 Client Avenue",
+        company: "Test Company Ltd",
+        notes: "This is a test client for demo purposes"
+      };
+      this.clients.set(testClient.id, testClient);
+      
+      // Create a test invoice
+      const today = new Date();
+      const dueDate = new Date();
+      dueDate.setDate(today.getDate() + 14); // Due in 14 days
+      
+      const testInvoice: Invoice = {
+        id: this.invoiceIdCounter++,
+        userId: testUser.id,
+        clientId: testClient.id,
+        invoiceNumber: "INV-2023-001",
+        issueDate: today,
+        dueDate: dueDate,
+        status: "sent",
+        totalAmount: "1250.00",
+        notes: "Payment for web development services",
+        isRecurring: false,
+        recurringFrequency: null,
+        lastSentDate: null
+      };
+      this.invoices.set(testInvoice.id, testInvoice);
+      
+      // Create test invoice items
+      const invoiceItems: InvoiceItem[] = [
+        {
+          id: this.invoiceItemIdCounter++,
+          invoiceId: testInvoice.id,
+          description: "Website Design",
+          quantity: "1",
+          unitPrice: "800.00",
+          amount: "800.00"
+        },
+        {
+          id: this.invoiceItemIdCounter++,
+          invoiceId: testInvoice.id,
+          description: "SEO Optimization",
+          quantity: "5",
+          unitPrice: "90.00",
+          amount: "450.00"
+        }
+      ];
+      
+      for (const item of invoiceItems) {
+        this.invoiceItems.set(item.id, item);
+      }
+      
     } catch (error) {
       console.error("Error creating test data:", error);
     }
