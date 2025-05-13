@@ -72,6 +72,32 @@ export class MemStorage implements IStorage {
     this.sessionStore = new MemoryStore({
       checkPeriod: 86400000 // prune expired entries every 24h
     });
+    
+    // Create a test user
+    this.createTestData();
+  }
+  
+  // Helper method to seed some test data
+  private async createTestData() {
+    try {
+      // Create a test user with a hashed password (password is "password")
+      const testUser: User = {
+        id: this.userIdCounter++,
+        username: "demo",
+        password: "5809528b1fcf2523c6f42df2338756cabbf131f1cbf6b337a258d1a8c308ecf4afd031bf102f0be60435ad840b5eef792b11b5c5ff5408435ed707d81330558f.0ed76b1336318aea735a91166e9c5ba5",
+        email: "demo@example.com",
+        businessName: "Demo Business",
+        address: "123 Demo Street",
+        phone: "555-1234",
+        taxNumber: "123456789",
+        plan: "free",
+        stripeCustomerId: null,
+        stripeSubscriptionId: null
+      };
+      this.users.set(testUser.id, testUser);
+    } catch (error) {
+      console.error("Error creating test data:", error);
+    }
   }
 
   // User operations
