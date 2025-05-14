@@ -1,0 +1,88 @@
+I'm working on improving my InvoiceNinja2 project (https://github.com/njrobinson96/InvoiceNinja2/tree/main), a Next.js-based invoicing application for freelancers and small businesses. Based on a code review, I need to focus on the following improvements:
+
+## Documentation Enhancements
+- Create a comprehensive README.md with:
+  - Project overview and purpose
+  - Tech stack description
+  - Setup and installation instructions
+  - Environment variable requirements
+  - Development workflow
+  - Deployment instructions
+  - Screenshots of key features
+
+## Core Feature Implementation
+1. Stripe Payment Integration:
+   - Connect Stripe API for payment processing
+   - Implement webhook handlers for payment events
+   - Create secure checkout flow for invoice payments
+   - Add payment status tracking
+
+2. PDF Generation:
+   - Implement PDF generation for invoices
+   - Create professional, customizable invoice templates
+   - Add download and email functionality for PDFs
+
+3. Email Notification System:
+   - Set up transactional email service integration
+   - Create email templates for:
+     - Invoice delivery
+     - Payment reminders
+     - Payment receipts
+     - Account notifications
+
+4. Recurring Invoice Functionality:
+   - Implement scheduling system for recurring invoices
+   - Add configuration options (frequency, start/end dates)
+   - Create management interface for recurring invoices
+
+## Technical Improvements
+1. Testing:
+   - Set up Jest and React Testing Library
+   - Write unit tests for critical components
+   - Implement API route tests
+   - Add integration tests for key user flows
+
+2. Error Handling:
+   - Create consistent error handling pattern
+   - Implement user-friendly error messages
+   - Add error logging and monitoring
+
+3. Security Enhancements:
+   - Implement input validation for all forms
+   - Add CSRF protection
+   - Set up rate limiting for API endpoints
+   - Review and secure authentication flows
+
+4. Performance Optimization:
+   - Implement proper data fetching strategies
+   - Add caching where appropriate
+   - Optimize bundle size and loading performance
+
+## UI/UX Improvements
+1. Responsive Design:
+   - Ensure all pages work well on mobile devices
+   - Implement responsive navigation
+   - Test on various screen sizes
+
+2. Accessibility:
+   - Add proper ARIA attributes
+   - Ensure keyboard navigation works
+   - Test with screen readers
+
+3. User Experience:
+   - Add loading states for async operations
+   - Implement better form validation feedback
+   - Create onboarding flow for new users
+
+## DevOps
+1. CI/CD Pipeline:
+   - Set up GitHub Actions for automated testing
+   - Configure deployment workflows
+   - Implement environment-specific configurations
+
+2. Monitoring:
+   - Add error tracking (Sentry or similar)
+   - Implement analytics for usage patterns
+   - Set up performance monitoring
+
+Please provide guidance on implementation approaches, best practices, and potential libraries or tools to help with these improvements. I'm particularly interested in the most efficient way to implement the payment processing and PDF generation features.

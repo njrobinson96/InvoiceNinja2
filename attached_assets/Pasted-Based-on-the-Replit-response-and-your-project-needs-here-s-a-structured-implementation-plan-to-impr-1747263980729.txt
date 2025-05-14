@@ -1,0 +1,674 @@
+Based on the Replit response and your project needs, here's a structured implementation plan to improve your InvoiceNinja2 project:
+1. Stripe Payment Integration Enhancement
+The basic Stripe integration is already implemented, but needs expansion:
+typescript
+Copy
+Focus
+// Add to your environment variables
+// .env.local
+STRIPE_WEBHOOK_SECRET=whsec_your_webhook_secret
+
+// Create a webhook handler (pages/api/webhooks/stripe.ts)
+import { buffer } from 'micro';
+import Stripe from 'stripe';
+
+export const config = {
+  api: {
+    bodyParser: false,
+  },
+};
+
+export default async function handler(req, res) {
+  if (req.method !== 'POST') {
+    return res.status(405).end('Method Not Allowed');
+  }
+
+  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
+  const sig = req.headers['stripe-signature']!;
+  const buf = await buffer(req);
+  
+  let event;
+  
+  try {
+    event = stripe.webhooks.constructEvent(
+      buf.toString(),
+      sig,
+      process.env.STRIPE_WEBHOOK_SECRET!
+    );
+  } catch (err: any) {
+    return res.status(400).send(`Webhook Error: ${err.message}`);
+  }
+
+  // Handle specific events
+  switch (event.type) {
+    case 'payment_intent.succeeded':
+      const paymentIntent = event.data.object;
+      await updateInvoicePaymentStatus(
+        paymentIntent.metadata.invoiceId,
+        'paid',
+        paymentIntent.id
+      );
+      break;
+    case 'payment_intent.payment_failed':
+      // Handle failed payment
+      break;
+    default:
+      console.log(`Unhandled event type ${event.type}`);
+  }
+
+  res.status(200).json({ received: true });
+}
+2. PDF Generation Implementation
+Implement PDF generation using @react-pdf/renderer:
+typescript
+Copy
+Focus
+// components/InvoicePDF.tsx
+import React from 'react';
+import { Document, Page, Text, View, StyleSheet, Font } from '@react-pdf/renderer';
+import { Invoice, Client } from '@/types';
+
+// Register fonts
+Font.register({
+  family: 'Roboto',
+  fonts: [
+    { src: '/fonts/Roboto-Regular.ttf' },
+    { src: '/fonts/Roboto-Bold.ttf', fontWeight: 'bold' }
+  ]
+});
+
+const styles = StyleSheet.create({
+  page: {
+    padding: 30,
+    fontFamily: 'Roboto',
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 30,
+  },
+  // Add more styles...
+});
+
+interface InvoicePDFProps {
+  invoice: Invoice;
+  client: Client;
+  company: {
+    name: string;
+    address: string;
+    email: string;
+    phone: string;
+    logo?: string;
+  };
+}
+
+const InvoicePDF: React.FC<InvoicePDFProps> = ({ invoice, client, company }) => (
+  <Document>
+    <Page size="A4" style={styles.page}>
+      {/* Company Info */}
+      <View style={styles.header}>
+        <View>
+          <Text style={styles.companyName}>{company.name}</Text>
+          <Text>{company.address}</Text>
+          <Text>{company.email}</Text>
+          <Text>{company.phone}</Text>
+        </View>
+        <View>
+          <Text style={styles.invoiceTitle}>INVOICE</Text>
+          <Text>#{invoice.invoiceNumber}</Text>
+          <Text>Date: {new Date(invoice.createdAt).toLocaleDateString()}</Text>
+          <Text>Due: {new Date(invoice.dueDate).toLocaleDateString()}</Text>
+        </View>
+      </View>
+      
+      {/* Client Info */}
+      <View style={styles.clientSection}>
+        <Text style={styles.sectionTitle}>Bill To:</Text>
+        <Text>{client.name}</Text>
+        <Text>{client.email}</Text>
+        <Text>{client.address}</Text>
+      </View>
+      
+      {/* Line Items */}
+      <View style={styles.table}>
+        {/* Table header */}
+        <View style={styles.tableRow}>
+          <Text style={[styles.tableCell, styles.tableHeader, { width: '40%' }]}>Description</Text>
+          <Text style={[styles.tableCell, styles.tableHeader, { width: '20%' }]}>Quantity</Text>
+          <Text style={[styles.tableCell, styles.tableHeader, { width: '20%' }]}>Unit Price</Text>
+          <Text style={[styles.tableCell, styles.tableHeader, { width: '20%' }]}>Amount</Text>
+        </View>
+        
+        {/* Table rows */}
+        {invoice.items.map((item, i) => (
+          <View key={i} style={styles.tableRow}>
+            <Text style={[styles.tableCell, { width: '40%' }]}>{item.description}</Text>
+            <Text style={[styles.tableCell, { width: '20%' }]}>{item.quantity}</Text>
+            <Text style={[styles.tableCell, { width: '20%' }]}>${item.unitPrice.toFixed(2)}</Text>
+            <Text style={[styles.tableCell, { width: '20%' }]}>${(item.quantity * item.unitPrice).toFixed(2)}</Text>
+          </View>
+        ))}
+      </View>
+      
+      {/* Totals */}
+      <View style={styles.totals}>
+        <View style={styles.totalRow}>
+          <Text style={styles.totalLabel}>Subtotal:</Text>
+          <Text style={styles.totalValue}>${invoice.subtotal.toFixed(2)}</Text>
+        </View>
+        <View style={styles.totalRow}>
+          <Text style={styles.totalLabel}>Tax ({invoice.taxRate}%):</Text>
+          <Text style={styles.totalValue}>${invoice.taxAmount.toFixed(2)}</Text>
+        </View>
+        <View style={styles.totalRow}>
+          <Text style={[styles.totalLabel, styles.totalAmount]}>Total:</Text>
+          <Text style={[styles.totalValue, styles.totalAmount]}>${invoice.totalAmount.toFixed(2)}</Text>
+        </View>
+      </View>
+      
+      {/* Payment Instructions */}
+      <View style={styles.footer}>
+        <Text style={styles.paymentTitle}>Payment Instructions</Text>
+        <Text>{invoice.paymentInstructions || 'Please pay within the due date.'}</Text>
+      </View>
+    </Page>
+  </Document>
+);
+
+export default InvoicePDF;
+3. Email Notification System
+Implement a robust email service using SendGrid:
+typescript
+Copy
+Focus
+// services/emailService.ts
+import sgMail from '@sendgrid/mail';
+import { Invoice, Client, User } from '@/types';
+import { renderToString } from 'react-dom/server';
+import { pdf } from '@react-pdf/renderer';
+import InvoicePDF from '@/components/InvoicePDF';
+
+sgMail.setApiKey(process.env.SENDGRID_API_KEY!);
+
+export async function sendInvoiceEmail(invoice: Invoice, client: Client, user: User) {
+  // Generate PDF
+  const pdfComponent = <InvoicePDF 
+    invoice={invoice} 
+    client={client} 
+    company={{
+      name: user.companyName || '',
+      address: user.companyAddress || '',
+      email: user.email,
+      phone: user.phone || '',
+    }} 
+  />;
+  
+  const pdfBlob = await pdf(pdfComponent).toBlob();
+  const pdfBuffer = Buffer.from(await pdfBlob.arrayBuffer());
+  
+  // Create payment link
+  const paymentLink = `${process.env.NEXT_PUBLIC_BASE_URL}/invoices/${invoice.id}/pay`;
+  
+  // Send email
+  const msg = {
+    to: client.email,
+    from: {
+      email: process.env.SENDGRID_FROM_EMAIL!,
+      name: user.companyName || user.name,
+    },
+    subject: `Invoice ${invoice.invoiceNumber} from ${user.companyName || user.name}`,
+    text: `Your invoice (${invoice.invoiceNumber}) is ready for review. Due date: ${new Date(invoice.dueDate).toLocaleDateString()}. Amount due: $${invoice.totalAmount.toFixed(2)}. Pay now: ${paymentLink}`,
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2>Invoice ${invoice.invoiceNumber}</h2>
+        <p>Hello ${client.name},</p>
+        <p>Your invoice is ready for review.</p>
+        <p><strong>Due date:</strong> ${new Date(invoice.dueDate).toLocaleDateString()}</p>
+        <p><strong>Amount due:</strong> $${invoice.totalAmount.toFixed(2)}</p>
+        <p>
+          <a href="${paymentLink}" style="background-color: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 4px; display: inline-block;">
+            Pay Now
+          </a>
+        </p>
+        <p>Thank you for your business!</p>
+        <p>Regards,<br>${user.companyName || user.name}</p>
+      </div>
+    `,
+    attachments: [
+      {
+        content: pdfBuffer.toString('base64'),
+        filename: `invoice-${invoice.invoiceNumber}.pdf`,
+        type: 'application/pdf',
+        disposition: 'attachment',
+      },
+    ],
+  };
+  
+  return sgMail.send(msg);
+}
+
+// Add more email functions (payment reminders, receipts, etc.)
+4. Recurring Invoice Functionality
+Implement a recurring invoice system:
+typescript
+Copy
+Focus
+// Add to your schema.ts
+export const recurringInvoiceSchema = pgTable('recurring_invoices', {
+  id: serial('id').primaryKey(),
+  userId: integer('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  clientId: integer('client_id').notNull().references(() => clients.id, { onDelete: 'cascade' }),
+  frequency: text('frequency').notNull(), // 'weekly', 'monthly', 'quarterly', 'annually'
+  nextGenerationDate: timestamp('next_generation_date').notNull(),
+  dayOfMonth: integer('day_of_month'), // for monthly/quarterly/annual
+  dayOfWeek: integer('day_of_week'), // for weekly
+  baseInvoiceId: integer('base_invoice_id').references(() => invoices.id),
+  active: boolean('active').default(true).notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+// Create a service for recurring invoices
+// services/recurringInvoiceService.ts
+import { db } from '@/db';
+import { recurringInvoiceSchema, invoiceSchema, invoiceItemSchema } from '@/db/schema';
+import { eq, and, lte } from 'drizzle-orm';
+import { addDays, addMonths, addYears } from 'date-fns';
+
+export async function generateDueRecurringInvoices() {
+  const today = new Date();
+  
+  // Find all recurring invoices that need generation
+  const dueRecurringInvoices = await db.query.recurringInvoiceSchema.findMany({
+    where: and(
+      eq(recurringInvoiceSchema.active, true),
+      lte(recurringInvoiceSchema.nextGenerationDate, today)
+    ),
+    with: {
+      baseInvoice: {
+        with: {
+          items: true,
+        },
+      },
+      client: true,
+    },
+  });
+  
+  for (const recurringInvoice of dueRecurringInvoices) {
+    await generateInvoiceFromRecurring(recurringInvoice);
+    await updateNextGenerationDate(recurringInvoice.id, recurringInvoice.frequency);
+  }
+}
+
+async function generateInvoiceFromRecurring(recurringInvoice) {
+  const { baseInvoice, client, userId } = recurringInvoice;
+  
+  // Create new invoice number
+  const invoiceNumber = `${baseInvoice.invoiceNumber.split('-')[0]}-${Date.now().toString().slice(-6)}`;
+  
+  // Calculate new dates
+  const issueDate = new Date();
+  const dueDate = addDays(issueDate, 30); // Default 30 days, adjust as needed
+  
+  // Create new invoice
+  const [newInvoice] = await db.insert(invoiceSchema).values({
+    userId,
+    clientId: client.id,
+    invoiceNumber,
+    issueDate,
+    dueDate,
+    status: 'draft',
+    subtotal: baseInvoice.subtotal,
+    taxRate: baseInvoice.taxRate,
+    taxAmount: baseInvoice.taxAmount,
+    totalAmount: baseInvoice.totalAmount,
+    notes: baseInvoice.notes,
+    terms: baseInvoice.terms,
+    isRecurring: false,
+  }).returning();
+  
+  // Create invoice items
+  for (const item of baseInvoice.items) {
+    await db.insert(invoiceItemSchema).values({
+      invoiceId: newInvoice.id,
+      description: item.description,
+      quantity: item.quantity,
+      unitPrice: item.unitPrice,
+      amount: item.amount,
+    });
+  }
+  
+  return newInvoice;
+}
+
+async function updateNextGenerationDate(recurringInvoiceId, frequency) {
+  const today = new Date();
+  let nextDate;
+  
+  switch (frequency) {
+    case 'weekly':
+      nextDate = addDays(today, 7);
+      break;
+    case 'monthly':
+      nextDate = addMonths(today, 1);
+      break;
+    case 'quarterly':
+      nextDate = addMonths(today, 3);
+      break;
+    case 'annually':
+      nextDate = addYears(today, 1);
+      break;
+    default:
+      nextDate = addMonths(today, 1); // Default to monthly
+  }
+  
+  await db.update(recurringInvoiceSchema)
+    .set({ nextGenerationDate: nextDate })
+    .where(eq(recurringInvoiceSchema.id, recurringInvoiceId));
+}
+5. Testing Implementation
+Set up Jest and React Testing Library:
+typescript
+Copy
+Focus
+// jest.config.js
+const nextJest = require('next/jest');
+
+const createJestConfig = nextJest({
+  dir: './',
+});
+
+const customJestConfig = {
+  setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
+  moduleNameMapper: {
+    '^@/(.*)$': '<rootDir>/$1',
+  },
+  testEnvironment: 'jest-environment-jsdom',
+};
+
+module.exports = createJestConfig(customJestConfig);
+
+// jest.setup.js
+import '@testing-library/jest-dom';
+
+// Example test for InvoiceForm component
+// __tests__/components/InvoiceForm.test.tsx
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import InvoiceForm from '@/components/InvoiceForm';
+import { SessionProvider } from 'next-auth/react';
+
+const mockSession = {
+  user: { id: 1, name: 'Test User', email: 'test@example.com' },
+  expires: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+};
+
+describe('InvoiceForm', () => {
+  it('renders form elements correctly', () => {
+    render(
+      <SessionProvider session={mockSession}>
+        <InvoiceForm clients={[{ id: 1, name: 'Test Client', email: 'client@example.com' }]} />
+      </SessionProvider>
+    );
+    
+    expect(screen.getByLabelText(/invoice number/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/client/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/due date/i)).toBeInTheDocument();
+  });
+  
+  it('validates required fields', async () => {
+    render(
+      <SessionProvider session={mockSession}>
+        <InvoiceForm clients={[{ id: 1, name: 'Test Client', email: 'client@example.com' }]} />
+      </SessionProvider>
+    );
+    
+    fireEvent.click(screen.getByRole('button', { name: /save/i }));
+    
+    await waitFor(() => {
+      expect(screen.getByText(/invoice number is required/i)).toBeInTheDocument();
+    });
+  });
+});
+6. Error Handling Implementation
+Create a robust error handling system:
+typescript
+Copy
+Focus
+// lib/errors.ts
+export class ApplicationError extends Error {
+  statusCode: number;
+  
+  constructor(message: string, statusCode = 500) {
+    super(message);
+    this.statusCode = statusCode;
+    this.name = this.constructor.name;
+  }
+}
+
+export class ValidationError extends ApplicationError {
+  errors: Record<string, string[]>;
+  
+  constructor(message: string, errors: Record<string, string[]> = {}) {
+    super(message, 400);
+    this.errors = errors;
+  }
+}
+
+export class NotFoundError extends ApplicationError {
+  constructor(message: string) {
+    super(message, 404);
+  }
+}
+
+export class UnauthorizedError extends ApplicationError {
+  constructor(message: string = 'Unauthorized') {
+    super(message, 401);
+  }
+}
+
+// middleware/errorHandler.ts
+import { NextApiRequest, NextApiResponse } from 'next';
+import { ApplicationError } from '@/lib/errors';
+
+export function errorHandler(
+  err: unknown,
+  req: NextApiRequest,
+  res: NextApiResponse
+) {
+  console.error(err);
+  
+  if (err instanceof ApplicationError) {
+    return res.status(err.statusCode).json({
+      error: {
+        message: err.message,
+        ...(err instanceof ValidationError && { errors: err.errors }),
+      },
+    });
+  }
+  
+  // Generic error
+  return res.status(500).json({
+    error: {
+      message: 'An unexpected error occurred',
+    },
+  });
+}
+
+// Example API route with error handling
+// pages/api/invoices/[id].ts
+import { NextApiRequest, NextApiResponse } from 'next';
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '../auth/[...nextauth]';
+import { db } from '@/db';
+import { invoiceSchema } from '@/db/schema';
+import { eq, and } from 'drizzle-orm';
+import { NotFoundError, UnauthorizedError } from '@/lib/errors';
+import { errorHandler } from '@/middleware/errorHandler';
+
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  try {
+    const session = await getServerSession(req, res, authOptions);
+    
+    if (!session?.user) {
+      throw new UnauthorizedError();
+    }
+    
+    const { id } = req.query;
+    const invoiceId = parseInt(id as string);
+    
+    if (isNaN(invoiceId)) {
+      throw new NotFoundError('Invalid invoice ID');
+    }
+    
+    const invoice = await db.query.invoiceSchema.findFirst({
+      where: and(
+        eq(invoiceSchema.id, invoiceId),
+        eq(invoiceSchema.userId, session.user.id)
+      ),
+      with: {
+        client: true,
+        items: true,
+      },
+    });
+    
+    if (!invoice) {
+      throw new NotFoundError('Invoice not found');
+    }
+    
+    return res.status(200).json(invoice);
+  } catch (error) {
+    return errorHandler(error, req, res);
+  }
+}
+7. Security Enhancements
+Implement rate limiting and CSRF protection:
+typescript
+Copy
+Focus
+// middleware/rateLimit.ts
+import rateLimit from 'express-rate-limit';
+import { NextApiRequest, NextApiResponse } from 'next';
+
+export const loginRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5, // 5 requests per windowMs
+  message: { error: { message: 'Too many login attempts, please try again later' } },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// pages/api/auth/[...nextauth].ts
+import { loginRateLimiter } from '@/middleware/rateLimit';
+
+// Apply rate limiter to specific routes
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  if (req.method === 'POST' && req.query.nextauth?.includes('callback') && req.query.nextauth?.includes('credentials')) {
+    return loginRateLimiter(req, res, () => NextAuth(req, res, authOptions));
+  }
+  
+  return NextAuth(req, res, authOptions);
+}
+8. Documentation
+Create a comprehensive README.md:
+markdown
+Copy
+Focus
+# InvoiceNinja2
+
+A modern invoicing application for freelancers and small businesses built with Next.js, TypeScript, and Stripe.
+
+## Features
+
+- **Client Management**: Store and manage client information
+- **Invoice Creation**: Create professional invoices with customizable templates
+- **Payment Processing**: Accept online payments via Stripe
+- **Recurring Invoices**: Set up automated recurring billing
+- **PDF Generation**: Generate and download invoice PDFs
+- **Email Notifications**: Send invoices and payment reminders via email
+- **Dashboard**: Track income, outstanding payments, and business performance
+
+## Tech Stack
+
+- **Frontend**: Next.js, React, TypeScript, Tailwind CSS
+- **Database**: PostgreSQL with Drizzle ORM
+- **Authentication**: NextAuth.js
+- **Payment Processing**: Stripe
+- **PDF Generation**: React-PDF
+- **Email Service**: SendGrid
+- **Deployment**: Vercel
+
+## Getting Started
+
+### Prerequisites
+
+- Node.js 16+
+- PostgreSQL database
+- Stripe account
+- SendGrid account
+
+### Installation
+
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/yourusername/InvoiceNinja2.git
+   cd InvoiceNinja2
+Install dependencies:
+bash
+Copy
+Focus
+npm install
+Set up environment variables:
+bash
+Copy
+Focus
+cp .env.example .env.local
+Edit .env.local with your configuration values.
+Run database migrations:
+bash
+Copy
+Focus
+npm run db:migrate
+Start the development server:
+bash
+Copy
+Focus
+npm run dev
+Environment Variables
+DATABASE_URL: PostgreSQL connection string
+NEXTAUTH_URL: URL of your application
+NEXTAUTH_SECRET: Secret for NextAuth.js
+STRIPE_PUBLIC_KEY: Stripe publishable key
+STRIPE_SECRET_KEY: Stripe secret key
+STRIPE_WEBHOOK_SECRET: Stripe webhook signing secret
+SENDGRID_API_KEY: SendGrid API key
+SENDGRID_FROM_EMAIL: Email address to send from
+Development
+Running Tests
+bash
+Copy
+Focus
+npm test
+Linting
+bash
+Copy
+Focus
+npm run lint
+Deployment
+This application is configured for deployment on Vercel:
+bash
+Copy
+Focus
+npm run build
+vercel --prod
+Contributing
+Fork the repository
+Create your feature branch (git checkout -b feature/amazing-feature)
+Commit your changes (git commit -m 'Add some amazing feature')
+Push to the branch (git push origin feature/amazing-feature)
+Open a Pull Request
+License
+This project is licensed under the MIT License - see the LICENSE file for details.
+Copy
+Focus
+
+This comprehensive implementation plan covers all the major areas you need to improve in your InvoiceNinja2 project. Each section provides practical code examples that you can adapt to your existing codebase. The plan focuses on the most critical features first (payment processing, PDF generation, email notifications) while also addressing technical improvements like testing and error handling.
