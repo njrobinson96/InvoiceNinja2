@@ -356,6 +356,53 @@ export default function InvoiceDetailPage() {
                     </div>
                   )}
                   
+                  {invoice.status === 'overdue' && (
+                    <div className="mt-8">
+                      <div className="p-4 bg-red-50 rounded-md mb-4">
+                        <div className="flex">
+                          <div className="flex-shrink-0">
+                            <svg className="h-5 w-5 text-red-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                            </svg>
+                          </div>
+                          <div className="ml-3">
+                            <h3 className="text-sm font-medium text-red-800">This invoice is overdue</h3>
+                            <div className="mt-2 text-sm text-red-700">
+                              <p>Payment for this invoice is past the due date. Send a reminder to the client.</p>
+                            </div>
+                            <div className="mt-4">
+                              <Button 
+                                variant="outline" 
+                                size="sm"
+                                onClick={async () => {
+                                  try {
+                                    const res = await fetch(`/api/invoices/${invoiceId}/remind`, {
+                                      method: 'POST',
+                                      headers: { 'Content-Type': 'application/json' }
+                                    });
+                                    
+                                    if (!res.ok) {
+                                      throw new Error('Failed to send reminder');
+                                    }
+                                    
+                                    const data = await res.json();
+                                    alert(`Payment reminder sent to ${data.email}`);
+                                  } catch (error) {
+                                    console.error('Error sending reminder:', error);
+                                    alert('Failed to send reminder. Please try again.');
+                                  }
+                                }}
+                              >
+                                <Send className="h-4 w-4 mr-2" />
+                                Send Reminder
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  
                   {invoice.status !== 'paid' && (
                     <div className="mt-8 flex justify-center">
                       <Link href={`/invoices/${invoiceId}/pay`}>
