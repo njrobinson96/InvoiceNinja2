@@ -1,0 +1,119 @@
+# InvoiceFlow Development Prompt
+
+## Project Overview
+Transform the existing InvoiceNinja2 codebase into a unique, feature-rich invoicing platform called "InvoiceFlow" with the following objectives:
+
+1. Complete the core invoicing functionality
+2. Implement secure payment processing
+3. Add PDF generation and email capabilities
+4. Create a polished, professional UI/UX
+5. Ensure robust security and error handling
+
+## Technical Requirements
+
+### 1. Rename and Rebrand
+- Rename the project from "InvoiceNinja2" to "InvoiceFlow" throughout all code, comments, and documentation
+- Create a unique brand identity with custom logo, color scheme, and typography
+- Update all UI components to reflect the new branding
+
+### 2. Complete Core Features
+- Finish the client management system with full CRUD operations
+- Enhance the invoice creation flow with:
+  - Line item management (add, edit, remove, reorder)
+  - Tax calculation options (multiple tax rates, tax-exempt items)
+  - Discount handling (percentage and fixed amounts)
+  - Custom fields for invoices
+- Implement dashboard with:
+  - Revenue tracking (monthly, quarterly, yearly)
+  - Outstanding invoice monitoring
+  - Client activity metrics
+  - Payment status visualization
+
+### 3. Payment Processing
+- Complete the Stripe integration for online payments
+- Implement webhook handlers for payment status updates
+- Add support for partial payments and payment plans
+- Create a client-facing payment portal with secure access
+- Add support for multiple payment methods (credit card, ACH, etc.)
+
+### 4. Document Generation
+- Implement PDF generation for invoices using react-pdf
+- Create multiple professional invoice templates
+- Add customization options for invoice appearance
+- Enable bulk operations (generate multiple PDFs, send multiple emails)
+
+### 5. Email System
+- Set up SendGrid integration for transactional emails
+- Create email templates for:
+  - Invoice delivery
+  - Payment reminders (scheduled based on due dates)
+  - Payment receipts
+  - Welcome emails for new clients
+- Implement email tracking (opened, clicked, etc.)
+
+### 6. Recurring Billing
+- Complete the recurring invoice system
+- Add flexible scheduling options (weekly, monthly, quarterly, annually)
+- Implement automatic invoice generation based on schedules
+- Create management interface for recurring invoice templates
+
+### 7. User Experience Improvements
+- Enhance form validation and error messaging
+- Add guided onboarding flow for new users
+- Implement responsive design for all screens
+- Create a comprehensive settings page for user preferences
+- Add keyboard shortcuts for power users
+
+### 8. Security Enhancements
+- Implement proper input validation and sanitization
+- Add rate limiting for authentication endpoints
+- Set up CSRF protection
+- Create proper role-based access control
+- Implement secure storage of sensitive information
+
+### 9. Testing and Quality Assurance
+- Set up Jest and React Testing Library
+- Write unit tests for critical components
+- Implement API endpoint tests
+- Add end-to-end testing with Cypress
+- Create a CI/CD pipeline with GitHub Actions
+
+### 10. Documentation
+- Create comprehensive README with setup instructions
+- Add inline code documentation
+- Create user documentation/help center content
+- Document API endpoints for potential future integrations
+
+## Unique Differentiators to Implement
+
+1. **AI-Powered Features**:
+   - Smart payment reminder scheduling based on client payment history
+   - Automatic categorization of invoice items
+   - Natural language invoice creation ("Create an invoice for web design, $2000, due in 30 days")
+
+2. **Client Collaboration Tools**:
+   - Client portal for project discussion
+   - Approval workflows for estimates/quotes
+   - Collaborative comment threads on invoices
+
+3. **Time-Tracking Integration**:
+   - Built-in time tracker for hourly billing
+   - Automatic invoice generation from tracked time
+   - Project budget tracking against invoiced amounts
+
+4. **Financial Insights**:
+   - Cash flow forecasting based on due dates and payment history
+   - Profitability analysis by client and service type
+   - Tax liability estimation and reporting
+
+5. **Multi-Currency and International Support**:
+   - Comprehensive multi-currency support
+   - Automatic exchange rate updates
+   - VAT/GST compliance for global markets
+   - Language localization
+
+## Deployment and Operations
+- Configure for deployment on Vercel
+- Set up proper environment variable management
+- Implement database backup strategy
+- Create monitoring and alerting system

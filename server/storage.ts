@@ -2,7 +2,9 @@ import {
   users, type User, type InsertUser,
   clients, type Client, type InsertClient,
   invoices, type Invoice, type InsertInvoice,
-  invoiceItems, type InvoiceItem, type InsertInvoiceItem
+  invoiceItems, type InvoiceItem, type InsertInvoiceItem,
+  recurringTemplates, type RecurringTemplate, type InsertRecurringTemplate,
+  recurringTemplateItems, type RecurringTemplateItem, type InsertRecurringTemplateItem
 } from "@shared/schema";
 import session from "express-session";
 import createMemoryStore from "memorystore";
@@ -39,6 +41,24 @@ export interface IStorage {
   updateInvoiceItem(id: number, itemData: Partial<InvoiceItem>): Promise<InvoiceItem>;
   deleteInvoiceItem(id: number): Promise<boolean>;
   
+  // Recurring Template operations
+  getRecurringTemplatesByUserId(userId: number): Promise<RecurringTemplate[]>;
+  getRecurringTemplateById(id: number): Promise<RecurringTemplate | undefined>;
+  createRecurringTemplate(template: InsertRecurringTemplate): Promise<RecurringTemplate>;
+  updateRecurringTemplate(id: number, templateData: Partial<RecurringTemplate>): Promise<RecurringTemplate>;
+  toggleRecurringTemplateStatus(id: number, active: boolean): Promise<RecurringTemplate>;
+  deleteRecurringTemplate(id: number): Promise<boolean>;
+  
+  // Recurring Template Items operations
+  getRecurringTemplateItemsByTemplateId(templateId: number): Promise<RecurringTemplateItem[]>;
+  createRecurringTemplateItem(item: InsertRecurringTemplateItem): Promise<RecurringTemplateItem>;
+  updateRecurringTemplateItem(id: number, itemData: Partial<RecurringTemplateItem>): Promise<RecurringTemplateItem>;
+  deleteRecurringTemplateItem(id: number): Promise<boolean>;
+  
+  // Recurring Invoice Generation
+  generateInvoicesFromTemplates(date?: Date): Promise<Invoice[]>;
+  generateInvoiceFromTemplate(templateId: number): Promise<Invoice>;
+  
   // Dashboard metrics
   getDashboardMetrics(userId: number): Promise<{
     pendingAmount: number;
@@ -58,11 +78,15 @@ export class MemStorage implements IStorage {
   private clients: Map<number, Client>;
   private invoices: Map<number, Invoice>;
   private invoiceItems: Map<number, InvoiceItem>;
-  sessionStore: session.SessionStore;
+  private recurringTemplates: Map<number, RecurringTemplate>;
+  private recurringTemplateItems: Map<number, RecurringTemplateItem>;
+  sessionStore: session.Store;
   private userIdCounter: number = 1;
   private clientIdCounter: number = 1;
   private invoiceIdCounter: number = 1;
   private invoiceItemIdCounter: number = 1;
+  private recurringTemplateIdCounter: number = 1;
+  private recurringTemplateItemIdCounter: number = 1;
 
   constructor() {
     this.users = new Map();

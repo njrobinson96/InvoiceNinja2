@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp, numeric, pgEnum } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, numeric, pgEnum, date } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -38,6 +38,16 @@ export const clients = pgTable("clients", {
   notes: text("notes"),
 });
 
+// Enum for recurring frequency
+export const recurringFrequencyEnum = pgEnum("recurring_frequency", [
+  "weekly",
+  "biweekly",
+  "monthly",
+  "quarterly",
+  "biannually",
+  "annually"
+]);
+
 // Invoice schema
 export const invoices = pgTable("invoices", {
   id: serial("id").primaryKey(),
@@ -52,12 +62,40 @@ export const invoices = pgTable("invoices", {
   isRecurring: boolean("is_recurring").default(false),
   recurringFrequency: text("recurring_frequency"),
   lastSentDate: timestamp("last_sent_date"),
+  recurringTemplateId: integer("recurring_template_id").references(() => recurringTemplates.id),
+});
+
+// Recurring Invoice Templates
+export const recurringTemplates = pgTable("recurring_templates", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id),
+  clientId: integer("client_id").notNull().references(() => clients.id),
+  name: text("name").notNull(),
+  frequency: text("frequency").notNull().$type<"weekly" | "biweekly" | "monthly" | "quarterly" | "biannually" | "annually">(),
+  nextGenerationDate: date("next_generation_date").notNull(),
+  daysBefore: integer("days_before").default(0), // Days before due date to generate
+  active: boolean("active").default(true),
+  notes: text("notes"),
+  autoSend: boolean("auto_send").default(false), // Automatically send generated invoices
+  emailTemplate: text("email_template"), // Custom email template for this recurring invoice
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
 // Invoice items schema
 export const invoiceItems = pgTable("invoice_items", {
   id: serial("id").primaryKey(),
   invoiceId: integer("invoice_id").notNull().references(() => invoices.id),
+  description: text("description").notNull(),
+  quantity: numeric("quantity").notNull(),
+  unitPrice: numeric("unit_price").notNull(),
+  amount: numeric("amount").notNull(),
+});
+
+// Recurring Template Items schema
+export const recurringTemplateItems = pgTable("recurring_template_items", {
+  id: serial("id").primaryKey(),
+  templateId: integer("template_id").notNull().references(() => recurringTemplates.id),
   description: text("description").notNull(),
   quantity: numeric("quantity").notNull(),
   unitPrice: numeric("unit_price").notNull(),
@@ -96,10 +134,32 @@ export const insertInvoiceSchema = createInsertSchema(invoices).pick({
   notes: true,
   isRecurring: true,
   recurringFrequency: true,
+  recurringTemplateId: true,
 });
 
 export const insertInvoiceItemSchema = createInsertSchema(invoiceItems).pick({
   invoiceId: true,
+  description: true,
+  quantity: true,
+  unitPrice: true,
+  amount: true,
+});
+
+export const insertRecurringTemplateSchema = createInsertSchema(recurringTemplates).pick({
+  userId: true,
+  clientId: true,
+  name: true,
+  frequency: true,
+  nextGenerationDate: true,
+  daysBefore: true,
+  active: true,
+  notes: true,
+  autoSend: true,
+  emailTemplate: true,
+});
+
+export const insertRecurringTemplateItemSchema = createInsertSchema(recurringTemplateItems).pick({
+  templateId: true,
   description: true,
   quantity: true,
   unitPrice: true,
@@ -118,3 +178,9 @@ export type Invoice = typeof invoices.$inferSelect;
 
 export type InsertInvoiceItem = z.infer<typeof insertInvoiceItemSchema>;
 export type InvoiceItem = typeof invoiceItems.$inferSelect;
+
+export type InsertRecurringTemplate = z.infer<typeof insertRecurringTemplateSchema>;
+export type RecurringTemplate = typeof recurringTemplates.$inferSelect;
+
+export type InsertRecurringTemplateItem = z.infer<typeof insertRecurringTemplateItemSchema>;
+export type RecurringTemplateItem = typeof recurringTemplateItems.$inferSelect;
