@@ -5,6 +5,8 @@ import { setupAuth } from "./auth";
 import { z } from "zod";
 import { insertClientSchema, insertInvoiceSchema, insertInvoiceItemSchema } from "@shared/schema";
 import Stripe from "stripe";
+import * as EmailService from "./services/email-service";
+import { renderToBuffer } from "@react-pdf/renderer";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Set up authentication routes
@@ -184,6 +186,151 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(200).json({
         clientSecret: paymentIntent.client_secret,
       });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+  
+  // Email invoice to client
+  app.post("/api/invoices/:id/send", isAuthenticated, async (req, res) => {
+    try {
+      const invoiceId = parseInt(req.params.id);
+      const invoice = await storage.getInvoiceById(invoiceId);
+      
+      if (!invoice || invoice.userId !== req.user.id) {
+        return res.status(404).json({ message: "Invoice not found" });
+      }
+      
+      const client = await storage.getClientById(invoice.clientId);
+      
+      if (!client) {
+        return res.status(404).json({ message: "Client not found" });
+      }
+      
+      const invoiceItems = await storage.getInvoiceItemsByInvoiceId(invoiceId);
+      
+      // Send the email
+      const success = await EmailService.sendInvoiceEmail(
+        invoice,
+        client,
+        req.user,
+        invoiceItems
+      );
+      
+      if (success) {
+        // Update invoice status to 'sent' if it's in 'draft' status
+        if (invoice.status === 'draft') {
+          await storage.updateInvoiceStatus(invoiceId, 'sent');
+        }
+        
+        // Update the lastSentDate
+        const now = new Date();
+        await storage.updateInvoice(invoiceId, { 
+          lastSentDate: now 
+        });
+        
+        res.status(200).json({
+          message: "Invoice sent successfully",
+          email: client.email
+        });
+      } else {
+        res.status(500).json({ message: "Failed to send email" });
+      }
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+  
+  // Send payment reminder email
+  app.post("/api/invoices/:id/remind", isAuthenticated, async (req, res) => {
+    try {
+      const invoiceId = parseInt(req.params.id);
+      const invoice = await storage.getInvoiceById(invoiceId);
+      
+      if (!invoice || invoice.userId !== req.user.id) {
+        return res.status(404).json({ message: "Invoice not found" });
+      }
+      
+      // Don't send reminders for paid invoices
+      if (invoice.status === 'paid') {
+        return res.status(400).json({ message: "Cannot send reminder for paid invoice" });
+      }
+      
+      const client = await storage.getClientById(invoice.clientId);
+      
+      if (!client) {
+        return res.status(404).json({ message: "Client not found" });
+      }
+      
+      // Calculate days overdue
+      const today = new Date();
+      const dueDate = new Date(invoice.dueDate);
+      const diffTime = today.getTime() - dueDate.getTime();
+      const daysOverdue = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      
+      // Send the reminder
+      const success = await EmailService.sendPaymentReminderEmail(
+        invoice,
+        client,
+        req.user,
+        daysOverdue
+      );
+      
+      if (success) {
+        // If invoice is overdue and not already marked as such, update the status
+        if (daysOverdue > 0 && invoice.status !== 'overdue') {
+          await storage.updateInvoiceStatus(invoiceId, 'overdue');
+        }
+        
+        res.status(200).json({
+          message: "Payment reminder sent",
+          email: client.email
+        });
+      } else {
+        res.status(500).json({ message: "Failed to send reminder" });
+      }
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+  
+  // Send receipt after payment
+  app.post("/api/invoices/:id/receipt", isAuthenticated, async (req, res) => {
+    try {
+      const invoiceId = parseInt(req.params.id);
+      const invoice = await storage.getInvoiceById(invoiceId);
+      
+      if (!invoice || invoice.userId !== req.user.id) {
+        return res.status(404).json({ message: "Invoice not found" });
+      }
+      
+      // Only send receipts for paid invoices
+      if (invoice.status !== 'paid') {
+        return res.status(400).json({ message: "Invoice is not marked as paid" });
+      }
+      
+      const client = await storage.getClientById(invoice.clientId);
+      
+      if (!client) {
+        return res.status(404).json({ message: "Client not found" });
+      }
+      
+      // Send the receipt
+      const success = await EmailService.sendPaymentReceiptEmail(
+        invoice,
+        client,
+        req.user,
+        new Date() // Use current date as payment date
+      );
+      
+      if (success) {
+        res.status(200).json({
+          message: "Payment receipt sent",
+          email: client.email
+        });
+      } else {
+        res.status(500).json({ message: "Failed to send receipt" });
+      }
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

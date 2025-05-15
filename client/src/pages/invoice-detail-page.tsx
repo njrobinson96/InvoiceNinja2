@@ -230,9 +230,30 @@ export default function InvoiceDetailPage() {
                       className="no-underline"
                     />
                   )}
-                  <Button variant="outline">
+                  <Button 
+                    variant="outline"
+                    onClick={async () => {
+                      try {
+                        const res = await fetch(`/api/invoices/${invoiceId}/send`, {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' }
+                        });
+                        
+                        if (!res.ok) {
+                          throw new Error('Failed to send invoice');
+                        }
+                        
+                        const data = await res.json();
+                        alert(`Invoice sent successfully to ${data.email}`);
+                        window.location.reload();
+                      } catch (error) {
+                        console.error('Error sending invoice:', error);
+                        alert('Failed to send invoice. Please try again.');
+                      }
+                    }}
+                  >
                     <Send className="h-4 w-4 mr-2" />
-                    Send
+                    Send Invoice
                   </Button>
                   <Link href={`/invoices/${invoiceId}/edit`}>
                     <Button>
