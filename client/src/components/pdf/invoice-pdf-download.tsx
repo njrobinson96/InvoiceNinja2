@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { PDFDownloadLink } from '@react-pdf/renderer';
-import { Button } from '../ui/button';
-import { DownloadIcon } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Loader2 } from 'lucide-react';
 import InvoicePDF from './invoice-pdf';
+
 // Using type definitions directly to avoid import issues
 interface Invoice {
   id: number;
@@ -47,6 +48,7 @@ interface InvoicePDFDownloadProps {
   client: Client;
   user: User;
   invoiceItems: any[];
+  fileName?: string;
   buttonText?: string;
   className?: string;
 }
@@ -56,9 +58,26 @@ const InvoicePDFDownload: React.FC<InvoicePDFDownloadProps> = ({
   client,
   user,
   invoiceItems,
+  fileName = `invoice-${invoice.invoiceNumber}.pdf`,
   buttonText = 'Download PDF',
   className = '',
 }) => {
+  const [isClient, setIsClient] = useState(false);
+  
+  // We need to use useEffect to ensure we're in a client environment for PDFDownloadLink
+  React.useEffect(() => {
+    setIsClient(true);
+  }, []);
+  
+  if (!isClient) {
+    return (
+      <Button disabled variant="outline" className={className}>
+        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+        Preparing PDF...
+      </Button>
+    );
+  }
+  
   return (
     <PDFDownloadLink
       document={
@@ -69,13 +88,19 @@ const InvoicePDFDownload: React.FC<InvoicePDFDownloadProps> = ({
           invoiceItems={invoiceItems}
         />
       }
-      fileName={`invoice-${invoice.invoiceNumber}.pdf`}
+      fileName={fileName}
       className={className}
     >
       {({ loading }) => (
         <Button variant="outline" disabled={loading}>
-          <DownloadIcon className="h-4 w-4 mr-2" />
-          {loading ? 'Generating PDF...' : buttonText}
+          {loading ? (
+            <>
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              Preparing...
+            </>
+          ) : (
+            buttonText
+          )}
         </Button>
       )}
     </PDFDownloadLink>

@@ -13,11 +13,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import InvoicePDFDownload from "../components/pdf/invoice-pdf-download";
+import InvoicePDFPrint from "../components/pdf/invoice-pdf-print";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Loader2 } from "lucide-react";
 
 export default function InvoiceDetailPage() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [printDialogOpen, setPrintDialogOpen] = useState(false);
   const params = useParams();
   const { user } = useAuth();
   const [location, setLocation] = useLocation();
@@ -221,14 +223,23 @@ export default function InvoiceDetailPage() {
                 </h1>
                 <div className="flex space-x-3">
                   {user && invoice && client && invoiceItems && (
-                    <InvoicePDFDownload
-                      invoice={invoice}
-                      client={client}
-                      user={user}
-                      invoiceItems={invoiceItems}
-                      buttonText="Download PDF"
-                      className="no-underline"
-                    />
+                    <>
+                      <InvoicePDFDownload
+                        invoice={invoice}
+                        client={client}
+                        user={user}
+                        invoiceItems={invoiceItems}
+                        buttonText="Download PDF"
+                        className="no-underline"
+                      />
+                      <Button 
+                        variant="outline"
+                        onClick={() => setPrintDialogOpen(true)}
+                      >
+                        <Printer className="h-4 w-4 mr-2" />
+                        Print
+                      </Button>
+                    </>
                   )}
                   <Button 
                     variant="outline"

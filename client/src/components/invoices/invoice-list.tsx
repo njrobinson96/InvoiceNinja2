@@ -359,6 +359,21 @@ export default function InvoiceList({ invoices, isLoading, error }: InvoiceListP
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      
+      {/* PDF Print Dialog */}
+      {printData && user && (
+        <InvoicePDFPrint
+          invoice={printData.invoice}
+          client={printData.client}
+          user={user}
+          invoiceItems={printData.items}
+          isOpen={printDialogOpen}
+          onClose={() => {
+            setPrintDialogOpen(false);
+            setPrintData(null);
+          }}
+        />
+      )}
     </>
   );
 }
