@@ -70,7 +70,7 @@ export interface IStorage {
   }>;
   
   // Session store
-  sessionStore: session.SessionStore;
+  sessionStore: session.Store;
 }
 
 export class MemStorage implements IStorage {
@@ -93,6 +93,8 @@ export class MemStorage implements IStorage {
     this.clients = new Map();
     this.invoices = new Map();
     this.invoiceItems = new Map();
+    this.recurringTemplates = new Map();
+    this.recurringTemplateItems = new Map();
     
     const MemoryStore = createMemoryStore(session);
     this.sessionStore = new MemoryStore({
@@ -428,6 +430,201 @@ export class MemStorage implements IStorage {
       recentInvoices: await Promise.all(recentInvoices),
       upcomingPayments: await Promise.all(upcomingPayments)
     };
+  }
+
+  // Recurring Template operations
+  async getRecurringTemplatesByUserId(userId: number): Promise<RecurringTemplate[]> {
+    return Array.from(this.recurringTemplates.values())
+      .filter(template => template.userId === userId);
+  }
+
+  async getRecurringTemplateById(id: number): Promise<RecurringTemplate | undefined> {
+    return this.recurringTemplates.get(id);
+  }
+
+  async createRecurringTemplate(template: InsertRecurringTemplate): Promise<RecurringTemplate> {
+    const id = this.recurringTemplateIdCounter++;
+    const newTemplate: RecurringTemplate = { 
+      ...template, 
+      id,
+      createdAt: new Date(),
+      updatedAt: new Date() 
+    };
+    this.recurringTemplates.set(id, newTemplate);
+    return newTemplate;
+  }
+
+  async updateRecurringTemplate(id: number, templateData: Partial<RecurringTemplate>): Promise<RecurringTemplate> {
+    const template = this.recurringTemplates.get(id);
+    if (!template) {
+      throw new Error(`Template with id ${id} not found`);
+    }
+    
+    const updatedTemplate: RecurringTemplate = { 
+      ...template, 
+      ...templateData,
+      updatedAt: new Date()
+    };
+    this.recurringTemplates.set(id, updatedTemplate);
+    return updatedTemplate;
+  }
+
+  async toggleRecurringTemplateStatus(id: number, active: boolean): Promise<RecurringTemplate> {
+    const template = this.recurringTemplates.get(id);
+    if (!template) {
+      throw new Error(`Template with id ${id} not found`);
+    }
+    
+    template.active = active;
+    template.updatedAt = new Date();
+    this.recurringTemplates.set(id, template);
+    return template;
+  }
+
+  async deleteRecurringTemplate(id: number): Promise<boolean> {
+    // Delete all template items first
+    const templateItems = await this.getRecurringTemplateItemsByTemplateId(id);
+    for (const item of templateItems) {
+      await this.deleteRecurringTemplateItem(item.id);
+    }
+    
+    // Then delete the template
+    return this.recurringTemplates.delete(id);
+  }
+
+  // Recurring Template Items operations
+  async getRecurringTemplateItemsByTemplateId(templateId: number): Promise<RecurringTemplateItem[]> {
+    return Array.from(this.recurringTemplateItems.values())
+      .filter(item => item.templateId === templateId);
+  }
+
+  async createRecurringTemplateItem(item: InsertRecurringTemplateItem): Promise<RecurringTemplateItem> {
+    const id = this.recurringTemplateItemIdCounter++;
+    const newItem: RecurringTemplateItem = { ...item, id };
+    this.recurringTemplateItems.set(id, newItem);
+    return newItem;
+  }
+
+  async updateRecurringTemplateItem(id: number, itemData: Partial<RecurringTemplateItem>): Promise<RecurringTemplateItem> {
+    const item = this.recurringTemplateItems.get(id);
+    if (!item) {
+      throw new Error(`Template item with id ${id} not found`);
+    }
+    
+    const updatedItem = { ...item, ...itemData };
+    this.recurringTemplateItems.set(id, updatedItem);
+    return updatedItem;
+  }
+
+  async deleteRecurringTemplateItem(id: number): Promise<boolean> {
+    return this.recurringTemplateItems.delete(id);
+  }
+
+  // Recurring Invoice Generation
+  async generateInvoicesFromTemplates(date: Date = new Date()): Promise<Invoice[]> {
+    const templates = Array.from(this.recurringTemplates.values())
+      .filter(template => template.active && new Date(template.nextGenerationDate) <= date);
+    
+    const generatedInvoices: Invoice[] = [];
+    
+    for (const template of templates) {
+      try {
+        const invoice = await this.generateInvoiceFromTemplate(template.id);
+        generatedInvoices.push(invoice);
+        
+        // Update the next generation date based on the frequency
+        const nextDate = new Date(template.nextGenerationDate);
+        switch (template.frequency) {
+          case 'weekly':
+            nextDate.setDate(nextDate.getDate() + 7);
+            break;
+          case 'biweekly':
+            nextDate.setDate(nextDate.getDate() + 14);
+            break;
+          case 'monthly':
+            nextDate.setMonth(nextDate.getMonth() + 1);
+            break;
+          case 'quarterly':
+            nextDate.setMonth(nextDate.getMonth() + 3);
+            break;
+          case 'biannually':
+            nextDate.setMonth(nextDate.getMonth() + 6);
+            break;
+          case 'annually':
+            nextDate.setFullYear(nextDate.getFullYear() + 1);
+            break;
+        }
+        
+        await this.updateRecurringTemplate(template.id, {
+          nextGenerationDate: nextDate,
+          updatedAt: new Date()
+        });
+      } catch (error) {
+        console.error(`Error generating invoice from template ${template.id}:`, error);
+      }
+    }
+    
+    return generatedInvoices;
+  }
+
+  async generateInvoiceFromTemplate(templateId: number): Promise<Invoice> {
+    const template = await this.getRecurringTemplateById(templateId);
+    if (!template) {
+      throw new Error(`Template with id ${templateId} not found`);
+    }
+    
+    // Get client to ensure it exists
+    const client = await this.getClientById(template.clientId);
+    if (!client) {
+      throw new Error(`Client with id ${template.clientId} not found`);
+    }
+    
+    // Generate invoice number
+    const invoiceNumber = `INV-${Date.now().toString().slice(-8)}`;
+    
+    // Set dates
+    const issueDate = new Date();
+    const dueDate = new Date();
+    dueDate.setDate(dueDate.getDate() + 30); // Default to 30 days due date
+    
+    // Get template items
+    const templateItems = await this.getRecurringTemplateItemsByTemplateId(templateId);
+    
+    // Calculate total amount
+    const totalAmount = templateItems.reduce((sum, item) => sum + Number(item.amount), 0).toString();
+    
+    // Create invoice
+    const invoice = await this.createInvoice({
+      userId: template.userId,
+      clientId: template.clientId,
+      invoiceNumber,
+      issueDate,
+      dueDate,
+      status: 'draft',
+      totalAmount,
+      notes: template.notes || '',
+      isRecurring: true,
+      recurringFrequency: template.frequency,
+      recurringTemplateId: templateId
+    });
+    
+    // Create invoice items from template items
+    for (const item of templateItems) {
+      await this.createInvoiceItem({
+        invoiceId: invoice.id,
+        description: item.description,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+        amount: item.amount
+      });
+    }
+    
+    // Automatically send if configured to do so
+    if (template.autoSend) {
+      await this.updateInvoiceStatus(invoice.id, 'sent');
+    }
+    
+    return invoice;
   }
 }
 

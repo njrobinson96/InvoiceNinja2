@@ -3,7 +3,13 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth } from "./auth";
 import { z } from "zod";
-import { insertClientSchema, insertInvoiceSchema, insertInvoiceItemSchema } from "@shared/schema";
+import { 
+  insertClientSchema, 
+  insertInvoiceSchema, 
+  insertInvoiceItemSchema,
+  insertRecurringTemplateSchema,
+  insertRecurringTemplateItemSchema
+} from "@shared/schema";
 import Stripe from "stripe";
 import * as EmailService from "./services/email-service";
 import { renderToBuffer } from "@react-pdf/renderer";
