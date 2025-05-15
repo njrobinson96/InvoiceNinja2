@@ -19,7 +19,6 @@ import { Loader2 } from "lucide-react";
 
 export default function InvoiceDetailPage() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [printDialogOpen, setPrintDialogOpen] = useState(false);
   const params = useParams();
   const { user } = useAuth();
   const [location, setLocation] = useLocation();
