@@ -11,6 +11,7 @@ import InvoiceCreatePage from "@/pages/invoice-create-page";
 import ClientCreatePage from "@/pages/client-create-page";
 import CheckoutPage from "@/pages/checkout-page";
 import InvoiceDetailPage from "./pages/invoice-detail-page";
+import RecurringTemplatesPage from "./pages/recurring-templates-page";
 import { AuthProvider } from "./hooks/use-auth";
 
 function Router() {
@@ -23,6 +24,7 @@ function Router() {
       <ProtectedRoute path="/invoices/:id/pay" component={CheckoutPage} />
       <ProtectedRoute path="/clients" component={ClientsPage} />
       <ProtectedRoute path="/clients/create" component={ClientCreatePage} />
+      <ProtectedRoute path="/recurring-templates" component={RecurringTemplatesPage} />
       <Route path="/auth" component={AuthPage} />
       <Route component={NotFound} />
     </Switch>

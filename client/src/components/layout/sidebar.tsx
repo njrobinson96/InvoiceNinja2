@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { File, LayoutDashboard, FilePen, Users, PieChart, Settings } from "lucide-react";
+import { File, LayoutDashboard, FilePen, Users, PieChart, Settings, CalendarClock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/use-auth";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -7,6 +7,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 const NAV_ITEMS = [
   { path: "/", label: "Dashboard", icon: LayoutDashboard },
   { path: "/invoices", label: "Invoices", icon: FilePen },
+  { path: "/recurring-templates", label: "Recurring Billing", icon: CalendarClock },
   { path: "/clients", label: "Clients", icon: Users },
   { path: "/reports", label: "Reports", icon: PieChart },
   { path: "/settings", label: "Settings", icon: Settings },
